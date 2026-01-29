@@ -1,0 +1,146 @@
+{
+  "brand_identity": {
+    "name": "JobNexus",
+    "archetype": "The Soft Utility",
+    "core_values": ["Clarity", "Efficiency", "Human-Centric", "Tech-Forward"],
+    "emotional_tone": "Professional but not cold. Trustworthy but modern."
+  },
+  "theme_strategy": {
+    "default_theme": "light",
+    "support_dark_mode": true,
+    "rationale": "Light mode builds trust and readability for long reading sessions (job descriptions). Dark mode appeals to the developer/tech audience."
+  },
+  "typography": {
+    "font_family": {
+      "headings": "Manrope, sans-serif",
+      "body": "Inter, sans-serif",
+      "mono": "JetBrains Mono, monospace"
+    },
+    "usage_rules": {
+      "headings": "Use Manrope for all H1-H6. Weight: Bold (700) or ExtraBold (800) for H1/H2. Letter-spacing: tight (-0.02em).",
+      "body": "Use Inter for all paragraphs and UI text. Weight: Regular (400) or Medium (500). Relaxed line-height (1.6).",
+      "buttons": "Manrope, Semibold (600). Uppercase optional for small tags."
+    },
+    "installation": "Import from Google Fonts: https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+  },
+  "color_palette": {
+    "primary": {
+      "name": "Electric Indigo",
+      "hex": "#4F46E5",
+      "tailwind_class": "bg-indigo-600",
+      "usage": "Primary buttons, active states, key brand elements. NOT for backgrounds."
+    },
+    "secondary": {
+      "name": "Slate Neutral",
+      "hex": "#64748B",
+      "tailwind_class": "text-slate-500",
+      "usage": "Subtitles, secondary icons, borders."
+    },
+    "accent": {
+      "success": "#10B981",
+      "warning": "#F59E0B",
+      "error": "#EF4444",
+      "info": "#3B82F6"
+    },
+    "backgrounds": {
+      "light": {
+        "page": "#FFFFFF",
+        "surface": "#F8FAFC",
+        "surface_highlight": "#F1F5F9"
+      },
+      "dark": {
+        "page": "#0F172A",
+        "surface": "#1E293B",
+        "surface_highlight": "#334155"
+      }
+    }
+  },
+  "layout_system": {
+    "spacing_scale": "Generous. Use p-6, p-8, p-12. Avoid cramped p-2 or p-4 for main containers.",
+    "container_width": "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8",
+    "bento_grid": {
+      "description": "Use for Landing Page categories and Dashboard summaries.",
+      "rules": [
+        "Grid cols: 1 (mobile) -> 3 (tablet) -> 4 (desktop)",
+        "Gap: gap-6 or gap-8",
+        "Spans: Feature items span 2 cols. Hero items span 2 rows."
+      ]
+    },
+    "dashboard_layout": {
+      "structure": "Sidebar (fixed left, 64px-240px) + Main Content (scrollable).",
+      "card_style": "Flat, 1px border (border-slate-200 dark:border-slate-800), no shadow by default. Hover: shadow-md."
+    }
+  },
+  "component_styles": {
+    "buttons": {
+      "primary": "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm rounded-md px-6 py-2.5 font-semibold transition-all active:scale-95",
+      "secondary": "bg-white text-slate-900 border border-slate-200 hover:bg-slate-50 shadow-sm rounded-md px-6 py-2.5 font-medium transition-all",
+      "ghost": "text-slate-600 hover:bg-slate-100 hover:text-slate-900 rounded-md px-4 py-2"
+    },
+    "cards": {
+      "base": "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6",
+      "interactive": "hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors cursor-pointer"
+    },
+    "inputs": {
+      "base": "h-11 rounded-md border-slate-200 dark:border-slate-800 bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-600"
+    },
+    "glassmorphism": {
+      "usage": "Sticky Headers, Modal Overlays only.",
+      "classes": "bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200/50"
+    }
+  },
+  "visual_assets": {
+    "images": {
+      "hero_office": {
+        "url": "https://images.unsplash.com/photo-1758518729685-f88df7890776?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "alt": "Top view of modern office team collaboration",
+        "usage": "Landing page hero or 'About Us' section"
+      },
+      "team_diverse": {
+        "url": "https://images.unsplash.com/photo-1758518731468-98e90ffd7430?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "alt": "Diverse group of professionals smiling",
+        "usage": "Testimonials or Candidate portal hero"
+      },
+      "modern_building": {
+        "url": "https://images.unsplash.com/photo-1673551799084-cf39a5110448?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "alt": "Modern green glass office building",
+        "usage": "Employer branding or 'For Companies' section"
+      },
+      "remote_work": {
+        "url": "https://images.unsplash.com/photo-1760611656007-f767a8082758?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "alt": "Two people working at a table",
+        "usage": "Remote work category or blog section"
+      }
+    },
+    "icons": {
+      "library": "lucide-react",
+      "style": "Stroke width 1.5px or 2px. Consistent size (w-5 h-5 for UI, w-6 h-6 for nav)."
+    }
+  },
+  "universal_guidelines": {
+    "anti_patterns": [
+      "NO generic 'Inter' for headings.",
+      "NO full-screen gradients.",
+      "NO centered text for long paragraphs.",
+      "NO 'transparent' backgrounds on dropdowns/overlays."
+    ],
+    "accessibility": {
+      "contrast": "Ensure text is slate-600 or darker on white. Slate-400 or lighter on dark.",
+      "focus": "All interactive elements must have visible focus rings (ring-2 ring-indigo-600).",
+      "testing": "Use data-testid on all buttons and inputs."
+    },
+    "motion": {
+      "micro_interactions": "Buttons scale down slightly on click (active:scale-95).",
+      "transitions": "Use 'transition-all duration-200 ease-in-out'.",
+      "page_load": "Fade in content (animate-in fade-in duration-500)."
+    }
+  },
+  "instructions_to_main_agent": [
+    "1. Update tailwind.config.js with the 'Electric Indigo' and 'Slate' palette.",
+    "2. Import 'Manrope' and 'Inter' fonts in index.css.",
+    "3. Create a 'Layout' component that handles the Sidebar/Header structure for dashboards.",
+    "4. Use the provided image URLs for the Landing Page.",
+    "5. Ensure all Shadcn components (Buttons, Cards, Inputs) are styled to match the 'Soft Utility' archetype (rounded-md, flat borders).",
+    "6. Implement the 'Bento Grid' for the Job Categories section on the landing page."
+  ]
+}

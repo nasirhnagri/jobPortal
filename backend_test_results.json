@@ -1,0 +1,141 @@
+{
+  "summary": {
+    "tests_run": 22,
+    "tests_passed": 22,
+    "success_rate": 100.0
+  },
+  "results": [
+    {
+      "test": "Super Admin Login",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-01-28T07:23:09.705202"
+    },
+    {
+      "test": "Admin Token Retrieved",
+      "success": true,
+      "details": "Token stored for subsequent tests",
+      "timestamp": "2026-01-28T07:23:09.705802"
+    },
+    {
+      "test": "Candidate Registration",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-01-28T07:23:10.377717"
+    },
+    {
+      "test": "Employer Registration",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-01-28T07:23:11.046162"
+    },
+    {
+      "test": "Get Current User (Admin)",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-01-28T07:23:11.707438"
+    },
+    {
+      "test": "Get Analytics",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-01-28T07:23:12.163660"
+    },
+    {
+      "test": "Get All Users",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-01-28T07:23:12.619360"
+    },
+    {
+      "test": "Get Pending Employers",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-01-28T07:23:13.069921"
+    },
+    {
+      "test": "Get Pending Jobs",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-01-28T07:23:13.418158"
+    },
+    {
+      "test": "Approve Employer",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-01-28T07:23:13.864890"
+    },
+    {
+      "test": "Create Sub-Admin",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-01-28T07:23:14.534586"
+    },
+    {
+      "test": "Get Sub-Admins",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-01-28T07:23:15.224962"
+    },
+    {
+      "test": "Get Employer Profile",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-01-28T07:23:15.676812"
+    },
+    {
+      "test": "Update Employer Profile",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-01-28T07:23:16.135471"
+    },
+    {
+      "test": "Create Job Posting",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-01-28T07:23:16.590612"
+    },
+    {
+      "test": "Get Employer Jobs",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-01-28T07:23:16.940519"
+    },
+    {
+      "test": "Get Candidate Profile",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-01-28T07:23:17.384635"
+    },
+    {
+      "test": "Update Candidate Profile",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-01-28T07:23:17.736010"
+    },
+    {
+      "test": "Get Candidate Applications",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-01-28T07:23:18.397649"
+    },
+    {
+      "test": "API Root",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-01-28T07:23:18.841401"
+    },
+    {
+      "test": "Get Public Jobs",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-01-28T07:23:19.181352"
+    },
+    {
+      "test": "Search Jobs with Query",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-01-28T07:23:19.626343"
+    }
+  ]
+}

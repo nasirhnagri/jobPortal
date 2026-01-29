@@ -1,0 +1,115 @@
+/* JobNexus Custom Styles */
+
+/* Glassmorphism Header */
+.glass-header {
+    @apply bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200/50;
+}
+
+/* Button animations */
+.btn-primary {
+    @apply bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm rounded-md px-6 py-2.5 font-semibold transition-all active:scale-95;
+}
+
+.btn-secondary {
+    @apply bg-white text-slate-900 border border-slate-200 hover:bg-slate-50 shadow-sm rounded-md px-6 py-2.5 font-medium transition-all;
+}
+
+.btn-ghost {
+    @apply text-slate-600 hover:bg-slate-100 hover:text-slate-900 rounded-md px-4 py-2;
+}
+
+/* Card styles */
+.card-base {
+    @apply bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6;
+}
+
+.card-interactive {
+    @apply hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors cursor-pointer;
+}
+
+/* Input focus styles */
+input:focus, textarea:focus, select:focus {
+    @apply outline-none ring-2 ring-indigo-600/20 border-indigo-600;
+}
+
+/* Sidebar styles */
+.sidebar-link {
+    @apply flex items-center gap-3 px-4 py-3 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors;
+}
+
+.sidebar-link.active {
+    @apply bg-indigo-50 text-indigo-700 font-medium;
+}
+
+/* Status badges */
+.badge-pending {
+    @apply bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-full text-xs font-medium;
+}
+
+.badge-approved {
+    @apply bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full text-xs font-medium;
+}
+
+.badge-rejected {
+    @apply bg-red-100 text-red-800 px-2.5 py-0.5 rounded-full text-xs font-medium;
+}
+
+.badge-active {
+    @apply bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full text-xs font-medium;
+}
+
+.badge-blocked {
+    @apply bg-red-100 text-red-800 px-2.5 py-0.5 rounded-full text-xs font-medium;
+}
+
+/* Stat card */
+.stat-card {
+    @apply bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6;
+}
+
+/* Table styles */
+.table-container {
+    @apply bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden;
+}
+
+/* Job card */
+.job-card {
+    @apply bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 hover:border-indigo-300 dark:hover:border-indigo-700 transition-all cursor-pointer;
+}
+
+/* Section container */
+.section-container {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+}
+
+/* Form group */
+.form-group {
+    @apply space-y-2;
+}
+
+.form-label {
+    @apply text-sm font-medium text-slate-700 dark:text-slate-300;
+}
+
+/* Page animations */
+.page-enter {
+    animation: fadeIn 0.3s ease-out;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    @apply bg-slate-100 dark:bg-slate-800;
+}
+
+::-webkit-scrollbar-thumb {
+    @apply bg-slate-300 dark:bg-slate-600 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-400 dark:bg-slate-500;
+}
