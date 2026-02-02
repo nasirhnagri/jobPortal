@@ -89,6 +89,7 @@ export const Landing = () => {
 
             <nav className="hidden md:flex items-center gap-8">
               <Link to="/jobs" className="text-slate-600 hover:text-slate-900 font-medium" data-testid="nav-find-jobs">Find Jobs</Link>
+              <Link to="/blog" className="text-slate-600 hover:text-slate-900 font-medium">Blog</Link>
               <Link to="/about" className="text-slate-600 hover:text-slate-900 font-medium">About</Link>
             </nav>
 

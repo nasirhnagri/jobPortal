@@ -35,6 +35,7 @@ const getNavItems = (role, permissions = []) => {
     { icon: Building2, label: 'Employers', href: '/admin/employers', permission: 'APPROVE_EMPLOYERS' },
     { icon: UserCheck, label: 'Users', href: '/admin/users', permission: 'MANAGE_USERS' },
     { icon: Briefcase, label: 'Jobs', href: '/admin/jobs', permission: 'MANAGE_JOBS' },
+    { icon: FileText, label: 'Blog', href: '/admin/blog', permission: 'MANAGE_BLOG' },
     { icon: BarChart3, label: 'Analytics', href: '/admin/analytics', permission: 'VIEW_REPORTS' },
   ];
 

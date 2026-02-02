@@ -38,9 +38,10 @@ export const Login = () => {
       };
       navigate(routes[user.role] || from);
     } catch (err) {
-      const message = err.response?.data?.detail || 'Invalid credentials';
-      setError(message);
-      toast.error(message);
+      const message = err.message || err.response?.data?.detail || 'Invalid credentials';
+      const displayMessage = typeof message === 'string' ? message : (Array.isArray(message) ? message.map(m => m.msg || m).join(', ') : 'Invalid credentials');
+      setError(displayMessage);
+      toast.error(displayMessage);
     } finally {
       setLoading(false);
     }

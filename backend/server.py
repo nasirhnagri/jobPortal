@@ -1,9 +1,11 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, File, UploadFile
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
+import re
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
@@ -145,6 +147,63 @@ class ApplicationResponse(BaseModel):
     status: str
     created_at: str
 
+# ======================== BLOG MODELS ========================
+
+class BlogCategoryCreate(BaseModel):
+    name: str
+    slug: Optional[str] = None
+    description: Optional[str] = None
+
+class BlogCategoryUpdate(BaseModel):
+    name: Optional[str] = None
+    slug: Optional[str] = None
+    description: Optional[str] = None
+
+class BlogTagCreate(BaseModel):
+    name: str
+    slug: Optional[str] = None
+
+class BlogTagUpdate(BaseModel):
+    name: Optional[str] = None
+    slug: Optional[str] = None
+
+class BlogPostCreate(BaseModel):
+    title: str
+    slug: Optional[str] = None
+    excerpt: Optional[str] = None
+    content: str
+    featured_image: Optional[str] = None
+    category_id: Optional[str] = None
+    tag_ids: List[str] = []
+    status: str = "draft"  # draft, pending_review, published
+    published_at: Optional[str] = None  # ISO datetime for scheduling
+    meta_title: Optional[str] = None
+    meta_description: Optional[str] = None
+    meta_keywords: Optional[str] = None
+    allow_comments: bool = True
+
+class BlogPostUpdate(BaseModel):
+    title: Optional[str] = None
+    slug: Optional[str] = None
+    excerpt: Optional[str] = None
+    content: Optional[str] = None
+    featured_image: Optional[str] = None
+    category_id: Optional[str] = None
+    tag_ids: Optional[List[str]] = None
+    status: Optional[str] = None
+    published_at: Optional[str] = None
+    meta_title: Optional[str] = None
+    meta_description: Optional[str] = None
+    meta_keywords: Optional[str] = None
+    allow_comments: Optional[bool] = None
+
+class BlogCommentCreate(BaseModel):
+    post_id: str
+    author_name: str
+    author_email: EmailStr
+    content: str
+    parent_id: Optional[str] = None
+
 # ======================== UTILS ========================
 
 def hash_password(password: str) -> str:
@@ -169,6 +228,18 @@ def decode_token(token: str) -> dict:
         raise HTTPException(status_code=401, detail="Token has expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+def slugify(text: str) -> str:
+    text = text.lower().strip()
+    text = re.sub(r'[^\w\s-]', '', text)
+    text = re.sub(r'[-\s]+', '-', text)
+    return text.strip('-') or str(uuid.uuid4())[:8]
+
+# Blog uploads
+UPLOAD_DIR = ROOT_DIR / "uploads"
+UPLOAD_DIR.mkdir(exist_ok=True)
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB
 
 # ======================== DEPENDENCIES ========================
 
@@ -289,7 +360,7 @@ async def create_subadmin(data: SubAdminCreate, user: dict = Depends(require_rol
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
     
-    valid_permissions = ["MANAGE_JOBS", "MANAGE_USERS", "APPROVE_EMPLOYERS", "VIEW_REPORTS"]
+    valid_permissions = ["MANAGE_JOBS", "MANAGE_USERS", "APPROVE_EMPLOYERS", "VIEW_REPORTS", "MANAGE_BLOG"]
     for perm in data.permissions:
         if perm not in valid_permissions:
             raise HTTPException(status_code=400, detail=f"Invalid permission: {perm}")
@@ -333,7 +404,7 @@ async def update_subadmin(subadmin_id: str, data: SubAdminUpdate, user: dict = D
     if data.name:
         update_data["name"] = data.name
     if data.permissions is not None:
-        valid_permissions = ["MANAGE_JOBS", "MANAGE_USERS", "APPROVE_EMPLOYERS", "VIEW_REPORTS"]
+        valid_permissions = ["MANAGE_JOBS", "MANAGE_USERS", "APPROVE_EMPLOYERS", "VIEW_REPORTS", "MANAGE_BLOG"]
         for perm in data.permissions:
             if perm not in valid_permissions:
                 raise HTTPException(status_code=400, detail=f"Invalid permission: {perm}")
@@ -775,12 +846,353 @@ async def get_job_details(job_id: str):
     
     return job
 
+# ======================== BLOG HELPERS ========================
+
+def require_blog_admin():
+    async def checker(user: dict = Depends(get_current_user)):
+        if user["role"] not in ("superadmin", "subadmin"):
+            raise HTTPException(status_code=403, detail="Access denied")
+        if user["role"] == "subadmin" and "MANAGE_BLOG" not in user.get("permissions", []):
+            raise HTTPException(status_code=403, detail="Permission denied")
+        return user
+    return checker
+
+# ======================== BLOG UPLOAD ========================
+
+@api_router.post("/blog/upload")
+async def blog_upload_image(
+    file: UploadFile = File(...),
+    user: dict = Depends(require_blog_admin())
+):
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail="Invalid file type. Use JPEG, PNG, GIF, or WebP.")
+    contents = await file.read()
+    if len(contents) > MAX_IMAGE_SIZE:
+        raise HTTPException(status_code=400, detail="File too large. Max 5MB.")
+    ext = Path(file.filename or "image").suffix or ".jpg"
+    if ext.lower() not in (".jpg", ".jpeg", ".png", ".gif", ".webp"):
+        ext = ".jpg"
+    filename = f"{uuid.uuid4().hex}{ext}"
+    filepath = UPLOAD_DIR / filename
+    with open(filepath, "wb") as f:
+        f.write(contents)
+    url = f"/uploads/{filename}"
+    return {"url": url}
+
+# ======================== BLOG ADMIN - CATEGORIES ========================
+
+@api_router.post("/blog/admin/categories")
+async def create_blog_category(data: BlogCategoryCreate, user: dict = Depends(require_blog_admin())):
+    slug = data.slug or slugify(data.name)
+    existing = await db.blog_categories.find_one({"slug": slug})
+    if existing:
+        raise HTTPException(status_code=400, detail="Category slug already exists")
+    cat_id = str(uuid.uuid4())
+    doc = {
+        "id": cat_id, "name": data.name, "slug": slug,
+        "description": data.description or "",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.blog_categories.insert_one(doc)
+    return {"id": cat_id, **{k: v for k, v in doc.items() if k != "_id"}}
+
+@api_router.get("/blog/admin/categories")
+async def list_blog_categories_admin(user: dict = Depends(require_blog_admin())):
+    cats = await db.blog_categories.find({}, {"_id": 0}).sort("name", 1).to_list(1000)
+    return cats
+
+@api_router.put("/blog/admin/categories/{category_id}")
+async def update_blog_category(category_id: str, data: BlogCategoryUpdate, user: dict = Depends(require_blog_admin())):
+    upd = {k: v for k, v in data.model_dump(exclude_unset=True).items() if v is not None}
+    if "name" in upd and "slug" not in upd:
+        upd["slug"] = slugify(upd["name"])
+    if upd:
+        await db.blog_categories.update_one({"id": category_id}, {"$set": upd})
+    cat = await db.blog_categories.find_one({"id": category_id}, {"_id": 0})
+    if not cat:
+        raise HTTPException(status_code=404, detail="Category not found")
+    return cat
+
+@api_router.delete("/blog/admin/categories/{category_id}")
+async def delete_blog_category(category_id: str, user: dict = Depends(require_blog_admin())):
+    r = await db.blog_categories.delete_one({"id": category_id})
+    if r.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Category not found")
+    return {"message": "Category deleted"}
+
+# ======================== BLOG ADMIN - TAGS ========================
+
+@api_router.post("/blog/admin/tags")
+async def create_blog_tag(data: BlogTagCreate, user: dict = Depends(require_blog_admin())):
+    slug = data.slug or slugify(data.name)
+    existing = await db.blog_tags.find_one({"slug": slug})
+    if existing:
+        raise HTTPException(status_code=400, detail="Tag slug already exists")
+    tag_id = str(uuid.uuid4())
+    doc = {"id": tag_id, "name": data.name, "slug": slug, "created_at": datetime.now(timezone.utc).isoformat()}
+    await db.blog_tags.insert_one(doc)
+    return {"id": tag_id, **{k: v for k, v in doc.items() if k != "_id"}}
+
+@api_router.get("/blog/admin/tags")
+async def list_blog_tags_admin(user: dict = Depends(require_blog_admin())):
+    tags = await db.blog_tags.find({}, {"_id": 0}).sort("name", 1).to_list(1000)
+    return tags
+
+@api_router.put("/blog/admin/tags/{tag_id}")
+async def update_blog_tag(tag_id: str, data: BlogTagUpdate, user: dict = Depends(require_blog_admin())):
+    upd = {k: v for k, v in data.model_dump(exclude_unset=True).items() if v is not None}
+    if "name" in upd and "slug" not in upd:
+        upd["slug"] = slugify(upd["name"])
+    if upd:
+        await db.blog_tags.update_one({"id": tag_id}, {"$set": upd})
+    tag = await db.blog_tags.find_one({"id": tag_id}, {"_id": 0})
+    if not tag:
+        raise HTTPException(status_code=404, detail="Tag not found")
+    return tag
+
+@api_router.delete("/blog/admin/tags/{tag_id}")
+async def delete_blog_tag(tag_id: str, user: dict = Depends(require_blog_admin())):
+    r = await db.blog_tags.delete_one({"id": tag_id})
+    if r.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Tag not found")
+    return {"message": "Tag deleted"}
+
+# ======================== BLOG ADMIN - POSTS ========================
+
+@api_router.post("/blog/admin/posts")
+async def create_blog_post(data: BlogPostCreate, user: dict = Depends(require_blog_admin())):
+    slug = data.slug or slugify(data.title)
+    existing = await db.blog_posts.find_one({"slug": slug})
+    if existing:
+        slug = f"{slug}-{uuid.uuid4().hex[:6]}"
+    now = datetime.now(timezone.utc).isoformat()
+    post_id = str(uuid.uuid4())
+    published_at = None
+    if data.status == "published":
+        published_at = data.published_at or now
+    elif data.published_at:
+        published_at = data.published_at
+    doc = {
+        "id": post_id, "title": data.title, "slug": slug, "excerpt": data.excerpt or "",
+        "content": data.content, "featured_image": data.featured_image,
+        "category_id": data.category_id, "tag_ids": data.tag_ids or [],
+        "status": data.status, "published_at": published_at,
+        "meta_title": data.meta_title, "meta_description": data.meta_description, "meta_keywords": data.meta_keywords,
+        "allow_comments": data.allow_comments,
+        "author_id": user["id"], "author_name": user.get("name", "Admin"),
+        "created_at": now, "updated_at": now,
+    }
+    await db.blog_posts.insert_one(doc)
+    return {"id": post_id, "slug": slug, **{k: v for k, v in doc.items() if k != "_id"}}
+
+@api_router.get("/blog/admin/posts")
+async def list_blog_posts_admin(
+    status: Optional[str] = None,
+    user: dict = Depends(require_blog_admin())
+):
+    q = {}
+    if status:
+        q["status"] = status
+    posts = await db.blog_posts.find(q, {"_id": 0}).sort("created_at", -1).to_list(500)
+    for p in posts:
+        if p.get("category_id"):
+            cat = await db.blog_categories.find_one({"id": p["category_id"]}, {"_id": 0, "name": 1, "slug": 1})
+            p["category"] = cat
+    return posts
+
+@api_router.get("/blog/admin/posts/{post_id}")
+async def get_blog_post_admin(post_id: str, user: dict = Depends(require_blog_admin())):
+    post = await db.blog_posts.find_one({"id": post_id}, {"_id": 0})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    if post.get("category_id"):
+        post["category"] = await db.blog_categories.find_one({"id": post["category_id"]}, {"_id": 0})
+    if post.get("tag_ids"):
+        post["tags"] = await db.blog_tags.find({"id": {"$in": post["tag_ids"]}}, {"_id": 0}).to_list(100)
+    return post
+
+@api_router.put("/blog/admin/posts/{post_id}")
+async def update_blog_post(post_id: str, data: BlogPostUpdate, user: dict = Depends(require_blog_admin())):
+    post = await db.blog_posts.find_one({"id": post_id})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    upd = {k: v for k, v in data.model_dump(exclude_unset=True).items() if v is not None}
+    if "title" in upd and "slug" not in upd:
+        upd["slug"] = slugify(upd["title"])
+    upd["updated_at"] = datetime.now(timezone.utc).isoformat()
+    if data.status == "published" and not post.get("published_at"):
+        upd["published_at"] = datetime.now(timezone.utc).isoformat()
+    await db.blog_posts.update_one({"id": post_id}, {"$set": upd})
+    return await db.blog_posts.find_one({"id": post_id}, {"_id": 0})
+
+@api_router.delete("/blog/admin/posts/{post_id}")
+async def delete_blog_post(post_id: str, user: dict = Depends(require_blog_admin())):
+    r = await db.blog_posts.delete_one({"id": post_id})
+    if r.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Post not found")
+    await db.blog_comments.delete_many({"post_id": post_id})
+    return {"message": "Post deleted"}
+
+@api_router.put("/blog/admin/posts/{post_id}/approve")
+async def approve_blog_post(post_id: str, user: dict = Depends(require_roles("superadmin"))):
+    post = await db.blog_posts.find_one({"id": post_id})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    await db.blog_posts.update_one(
+        {"id": post_id},
+        {"$set": {"status": "published", "published_at": post.get("published_at") or datetime.now(timezone.utc).isoformat(), "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    return {"message": "Post approved"}
+
+# ======================== BLOG PUBLIC ========================
+
+@api_router.get("/blog/posts")
+async def list_blog_posts_public(
+    category: Optional[str] = None,
+    tag: Optional[str] = None,
+    search: Optional[str] = None,
+    featured: Optional[bool] = None,
+    page: int = 1,
+    limit: int = 12,
+):
+    now = datetime.now(timezone.utc).isoformat()
+    q = {"status": "published", "$or": [{"published_at": {"$lte": now}}, {"published_at": None}]}
+    if category:
+        cat = await db.blog_categories.find_one({"slug": category}, {"_id": 0, "id": 1})
+        if cat:
+            q["category_id"] = cat["id"]
+    if tag:
+        t = await db.blog_tags.find_one({"slug": tag}, {"_id": 0, "id": 1})
+        if t:
+            q["tag_ids"] = t["id"]
+    if search:
+        search_or = [
+            {"title": {"$regex": search, "$options": "i"}},
+            {"excerpt": {"$regex": search, "$options": "i"}},
+            {"content": {"$regex": search, "$options": "i"}},
+        ]
+        q = {"$and": [q, {"$or": search_or}]}
+    if featured:
+        q["featured"] = True
+    skip = (page - 1) * limit
+    cursor = db.blog_posts.find(q, {"_id": 0}).sort("published_at", -1).skip(skip).limit(limit)
+    posts = await cursor.to_list(limit)
+    total = await db.blog_posts.count_documents(q)
+    for p in posts:
+        if p.get("category_id"):
+            p["category"] = await db.blog_categories.find_one({"id": p["category_id"]}, {"_id": 0})
+        if p.get("tag_ids"):
+            p["tags"] = await db.blog_tags.find({"id": {"$in": p["tag_ids"]}}, {"_id": 0}).to_list(100)
+    return {"posts": posts, "total": total, "page": page, "limit": limit}
+
+@api_router.get("/blog/posts/featured")
+async def list_featured_posts(limit: int = 6):
+    now = datetime.now(timezone.utc).isoformat()
+    q = {"status": "published", "$or": [{"published_at": {"$lte": now}}, {"published_at": None}]}
+    posts = await db.blog_posts.find(q, {"_id": 0}).sort("published_at", -1).limit(limit).to_list(limit)
+    for p in posts:
+        if p.get("category_id"):
+            p["category"] = await db.blog_categories.find_one({"id": p["category_id"]}, {"_id": 0})
+    return posts
+
+@api_router.get("/blog/posts/{slug}")
+async def get_blog_post_public(slug: str):
+    now = datetime.now(timezone.utc).isoformat()
+    post = await db.blog_posts.find_one(
+        {"slug": slug, "status": "published", "$or": [{"published_at": {"$lte": now}}, {"published_at": None}]},
+        {"_id": 0}
+    )
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    if post.get("category_id"):
+        post["category"] = await db.blog_categories.find_one({"id": post["category_id"]}, {"_id": 0})
+    if post.get("tag_ids"):
+        post["tags"] = await db.blog_tags.find({"id": {"$in": post["tag_ids"]}}, {"_id": 0}).to_list(100)
+    # Related posts (same category or shared tags)
+    base_q = {"id": {"$ne": post["id"]}, "status": "published", "$or": [{"published_at": {"$lte": now}}, {"published_at": None}]}
+    if post.get("category_id") or post.get("tag_ids"):
+        or_clauses = []
+        if post.get("category_id"):
+            or_clauses.append({"category_id": post["category_id"]})
+        if post.get("tag_ids"):
+            or_clauses.append({"tag_ids": {"$in": post["tag_ids"]}})
+        related_q = {"$and": [base_q, {"$or": or_clauses}]}
+    else:
+        related_q = base_q
+    related = await db.blog_posts.find(related_q, {"_id": 0}).limit(4).to_list(4)
+    for r in related:
+        if r.get("category_id"):
+            r["category"] = await db.blog_categories.find_one({"id": r["category_id"]}, {"_id": 0})
+    post["related_posts"] = related
+    return post
+
+@api_router.get("/blog/categories")
+async def list_blog_categories_public():
+    cats = await db.blog_categories.find({}, {"_id": 0}).sort("name", 1).to_list(100)
+    return cats
+
+@api_router.get("/blog/tags")
+async def list_blog_tags_public():
+    tags = await db.blog_tags.find({}, {"_id": 0}).sort("name", 1).to_list(200)
+    return tags
+
+@api_router.get("/blog/rss")
+async def blog_rss_feed():
+    now = datetime.now(timezone.utc).isoformat()
+    q = {"status": "published", "$or": [{"published_at": {"$lte": now}}, {"published_at": None}]}
+    posts = await db.blog_posts.find(q, {"_id": 0}).sort("published_at", -1).limit(50).to_list(50)
+    base_url = os.environ.get("SITE_URL", "https://jobnexus.example.com")
+    items = []
+    for p in posts:
+        items.append({
+            "title": p["title"],
+            "link": f"{base_url}/blog/{p['slug']}",
+            "description": p.get("excerpt") or p.get("content", "")[:500],
+            "pubDate": p.get("published_at") or p.get("created_at"),
+        })
+    return {"title": "JobNexus Blog", "link": f"{base_url}/blog", "items": items}
+
+# ======================== BLOG COMMENTS (optional) ========================
+
+@api_router.post("/blog/posts/{post_id}/comments")
+async def create_blog_comment(post_id: str, data: BlogCommentCreate):
+    post = await db.blog_posts.find_one({"id": post_id, "status": "published"}, {"_id": 0})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    if not post.get("allow_comments", True):
+        raise HTTPException(status_code=400, detail="Comments disabled")
+    comment_id = str(uuid.uuid4())
+    doc = {
+        "id": comment_id, "post_id": post_id, "author_name": data.author_name, "author_email": data.author_email,
+        "content": data.content, "parent_id": data.parent_id, "status": "pending",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.blog_comments.insert_one(doc)
+    return {"id": comment_id, "message": "Comment submitted for moderation"}
+
+@api_router.get("/blog/posts/{post_id}/comments")
+async def list_blog_comments_public(post_id: str):
+    comments = await db.blog_comments.find({"post_id": post_id, "status": "approved"}, {"_id": 0}).sort("created_at", 1).to_list(200)
+    return comments
+
+@api_router.put("/blog/admin/comments/{comment_id}/moderate")
+async def moderate_blog_comment(comment_id: str, status: str, user: dict = Depends(require_blog_admin())):
+    if status not in ("approved", "rejected"):
+        raise HTTPException(status_code=400, detail="Status must be approved or rejected")
+    r = await db.blog_comments.update_one({"id": comment_id}, {"$set": {"status": status}})
+    if r.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    return {"message": f"Comment {status}"}
+
 @api_router.get("/")
 async def root():
     return {"message": "JobNexus API", "version": "1.0.0"}
 
 # Include router
 app.include_router(api_router)
+
+# Serve uploaded blog images
+app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 # CORS
 app.add_middleware(
@@ -795,6 +1207,10 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup_event():
     logger.info("Starting JobNexus API...")
+    
+    # Ensure uploads directory exists
+    UPLOAD_DIR.mkdir(exist_ok=True)
+    logger.info(f"Uploads directory ready: {UPLOAD_DIR}")
     
     # Check if super admin exists
     super_admin = await db.users.find_one({"role": "superadmin"})
@@ -819,3 +1235,13 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        "server:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=os.environ.get("DEV", "0") == "1",
+    )
