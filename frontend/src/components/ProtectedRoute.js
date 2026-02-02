@@ -1,7 +1,7 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-export const ProtectedRoute = ({ children, roles = [] }) => {
+export const ProtectedRoute = ({ children, roles = [], permissions = [] }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
 
@@ -29,6 +29,15 @@ export const ProtectedRoute = ({ children, roles = [] }) => {
       candidate: '/candidate'
     };
     return <Navigate to={dashboardRoutes[user.role] || '/'} replace />;
+  }
+
+  // For subadmins: require at least one of the given permissions (superadmin bypasses)
+  if (user.role === 'subadmin' && permissions.length > 0) {
+    const userPerms = user.permissions || [];
+    const hasPermission = permissions.some((p) => userPerms.includes(p));
+    if (!hasPermission) {
+      return <Navigate to="/admin" replace />;
+    }
   }
 
   // Check if employer is pending

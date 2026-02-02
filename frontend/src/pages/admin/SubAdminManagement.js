@@ -39,6 +39,7 @@ const PERMISSIONS = [
   { id: 'MANAGE_USERS', label: 'Manage Users', description: 'View and manage user accounts' },
   { id: 'APPROVE_EMPLOYERS', label: 'Approve Employers', description: 'Review and approve employer accounts' },
   { id: 'VIEW_REPORTS', label: 'View Reports', description: 'Access analytics and reports' },
+  { id: 'MANAGE_BLOG', label: 'Manage Blog', description: 'Create, edit, and publish blog posts' },
 ];
 
 export const SubAdminManagement = () => {
@@ -198,7 +199,7 @@ export const SubAdminManagement = () => {
                           {subadmin.permissions?.length > 0 ? (
                             subadmin.permissions.map((perm) => (
                               <span key={perm} className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs">
-                                {perm.replace('_', ' ')}
+                                {PERMISSIONS.find((p) => p.id === perm)?.label || perm.replace(/_/g, ' ')}
                               </span>
                             ))
                           ) : (

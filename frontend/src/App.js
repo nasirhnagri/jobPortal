@@ -10,6 +10,8 @@ import { Login } from "./pages/auth/Login";
 import { Register } from "./pages/auth/Register";
 import { JobListings } from "./pages/jobs/JobListings";
 import { JobDetails } from "./pages/jobs/JobDetails";
+import { BlogList } from "./pages/blog/BlogList";
+import { BlogPost } from "./pages/blog/BlogPost";
 
 // Admin Pages
 import { AdminDashboard } from "./pages/admin/AdminDashboard";
@@ -18,6 +20,12 @@ import { UserManagement } from "./pages/admin/UserManagement";
 import { JobManagement } from "./pages/admin/JobManagement";
 import { EmployerManagement } from "./pages/admin/EmployerManagement";
 import { Analytics } from "./pages/admin/Analytics";
+// import { BlogManagement } from "./pages/admin/BlogManagement";
+import BlogManagement from './pages/admin/BlogManagement';
+// import { BlogPostEdit } from "./pages/admin/BlogPostEdit";
+// import BlogEditor from './pages/admin/BlogEditor';
+import BlogEditor from './pages/admin/BlogPostEdit';
+
 
 // Employer Pages
 import { EmployerDashboard } from "./pages/employer/EmployerDashboard";
@@ -43,6 +51,8 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/jobs" element={<JobListings />} />
           <Route path="/jobs/:id" element={<JobDetails />} />
+          <Route path="/blog" element={<BlogList />} />
+          <Route path="/blog/:slug" element={<BlogPost />} />
 
           {/* Admin Routes */}
           <Route
@@ -90,6 +100,38 @@ function App() {
             element={
               <ProtectedRoute roles={["superadmin", "subadmin"]}>
                 <Analytics />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/blog"
+            element={
+              <ProtectedRoute roles={["superadmin", "subadmin"]} permissions={["MANAGE_BLOG"]}>
+                <BlogManagement />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/blogs"
+            element={
+              <ProtectedRoute roles={["superadmin", "subadmin"]} permissions={["MANAGE_BLOG"]}>
+                <BlogManagement />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/blog/new"
+            element={
+              <ProtectedRoute roles={["superadmin", "subadmin"]} permissions={["MANAGE_BLOG"]}>
+                <BlogEditor />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/blog/edit/:id"
+            element={
+              <ProtectedRoute roles={["superadmin", "subadmin"]} permissions={["MANAGE_BLOG"]}>
+                <BlogEditor />
               </ProtectedRoute>
             }
           />
