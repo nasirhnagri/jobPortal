@@ -2,12 +2,15 @@ import "./App.css"; // relative path
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "./components/ui/sonner";
 import { AuthProvider } from "./context/AuthContext";
+import { ThemeProvider } from "./context/ThemeContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
 // Pages
 import { Landing } from "./pages/Landing";
 import { Login } from "./pages/auth/Login";
 import { Register } from "./pages/auth/Register";
+import { ForgotPassword } from "./pages/auth/ForgotPassword";
+import { ResetPassword } from "./pages/auth/ResetPassword";
 import { JobListings } from "./pages/jobs/JobListings";
 import { JobDetails } from "./pages/jobs/JobDetails";
 import { BlogList } from "./pages/blog/BlogList";
@@ -25,6 +28,7 @@ import BlogManagement from './pages/admin/BlogManagement';
 // import { BlogPostEdit } from "./pages/admin/BlogPostEdit";
 // import BlogEditor from './pages/admin/BlogEditor';
 import BlogEditor from './pages/admin/BlogPostEdit';
+import HeroVideoManagement from './pages/admin/HeroVideoManagement';
 
 
 // Employer Pages
@@ -43,12 +47,15 @@ import { CandidateApplications } from "./pages/candidate/CandidateApplications";
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
+      <ThemeProvider>
+        <BrowserRouter>
+          <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/jobs" element={<JobListings />} />
           <Route path="/jobs/:id" element={<JobDetails />} />
           <Route path="/blog" element={<BlogList />} />
@@ -132,6 +139,14 @@ function App() {
             element={
               <ProtectedRoute roles={["superadmin", "subadmin"]} permissions={["MANAGE_BLOG"]}>
                 <BlogEditor />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/hero-videos"
+            element={
+              <ProtectedRoute roles={["superadmin"]}>
+                <HeroVideoManagement />
               </ProtectedRoute>
             }
           />
@@ -222,8 +237,9 @@ function App() {
 
           {/* Catch all - redirect to home */}
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
+          </Routes>
+        </BrowserRouter>
+      </ThemeProvider>
       <Toaster position="top-right" richColors />
     </AuthProvider>
   );

@@ -17,7 +17,9 @@ import {
   ClipboardList,
   UserCircle,
   Search,
-  Bell
+  Bell,
+  Moon,
+  Sun
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import {
@@ -36,6 +38,7 @@ const getNavItems = (role, permissions = []) => {
     { icon: UserCheck, label: 'Users', href: '/admin/users', permission: 'MANAGE_USERS' },
     { icon: Briefcase, label: 'Jobs', href: '/admin/jobs', permission: 'MANAGE_JOBS' },
     { icon: FileText, label: 'Blog', href: '/admin/blog', permission: 'MANAGE_BLOG' },
+    { icon: FileText, label: 'Hero Videos', href: '/admin/hero-videos', superadminOnly: true },
     { icon: BarChart3, label: 'Analytics', href: '/admin/analytics', permission: 'VIEW_REPORTS' },
   ];
 
@@ -68,11 +71,14 @@ const getNavItems = (role, permissions = []) => {
   return [];
 };
 
+import { useTheme } from '../../context/ThemeContext';
+
 export const DashboardLayout = ({ children }) => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { theme, toggleTheme } = useTheme();
 
   const navItems = getNavItems(user?.role, user?.permissions);
 
@@ -173,6 +179,19 @@ export const DashboardLayout = ({ children }) => {
             <div className="flex-1 lg:flex-none" />
 
             <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="hidden sm:inline-flex"
+                onClick={toggleTheme}
+                data-testid="theme-toggle-dashboard"
+              >
+                {theme === 'dark' ? (
+                  <Sun className="w-5 h-5 text-slate-500" />
+                ) : (
+                  <Moon className="w-5 h-5 text-slate-500" />
+                )}
+              </Button>
               <Button variant="ghost" size="icon" className="relative" data-testid="notifications-button">
                 <Bell className="w-5 h-5 text-slate-500" />
               </Button>
