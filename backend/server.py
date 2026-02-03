@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, File, UploadFile
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, File, UploadFile, Form
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
@@ -7,6 +7,9 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import re
 import logging
+import hashlib
+import smtplib
+from email.message import EmailMessage
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import List, Optional
@@ -14,6 +17,13 @@ import uuid
 from datetime import datetime, timezone, timedelta
 import jwt
 import bcrypt
+
+try:
+    from google.oauth2 import id_token as google_id_token  # type: ignore
+    from google.auth.transport import requests as google_requests  # type: ignore
+except Exception:  # pragma: no cover
+    google_id_token = None
+    google_requests = None
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -51,6 +61,17 @@ class UserCreate(UserBase):
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+
+class GoogleLoginRequest(BaseModel):
+    credential: str
+    role: str = "candidate"  # candidate, employer
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+class PasswordResetConfirm(BaseModel):
+    token: str
+    new_password: str
 
 class UserResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -204,6 +225,52 @@ class BlogCommentCreate(BaseModel):
     content: str
     parent_id: Optional[str] = None
 
+# ======================== HERO VIDEO MODELS ========================
+
+class HeroVideoUpdate(BaseModel):
+    title: Optional[str] = None
+    status: Optional[str] = None  # active, inactive
+    order: Optional[int] = None
+
+# ======================== PASSWORD RESET HELPERS ========================
+
+def sha256_hex(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+def can_send_email() -> bool:
+    return bool(os.environ.get("SMTP_HOST") and os.environ.get("SMTP_FROM"))
+
+def send_reset_email(to_email: str, reset_link: str):
+    """
+    Best-effort SMTP send. Controlled by SMTP_* env vars.
+    """
+    host = os.environ.get("SMTP_HOST")
+    port = int(os.environ.get("SMTP_PORT", "587"))
+    user = os.environ.get("SMTP_USER")
+    password = os.environ.get("SMTP_PASSWORD")
+    from_email = os.environ.get("SMTP_FROM")
+
+    if not host or not from_email:
+        raise RuntimeError("SMTP_HOST/SMTP_FROM not configured")
+
+    msg = EmailMessage()
+    msg["Subject"] = "Reset your JobNexus password"
+    msg["From"] = from_email
+    msg["To"] = to_email
+    msg.set_content(
+        f"Use this link to reset your password:\n\n{reset_link}\n\n"
+        f"If you didn't request this, you can ignore this email."
+    )
+
+    with smtplib.SMTP(host, port, timeout=20) as smtp:
+        smtp.ehlo()
+        if os.environ.get("SMTP_TLS", "1") == "1":
+            smtp.starttls()
+            smtp.ehlo()
+        if user and password:
+            smtp.login(user, password)
+        smtp.send_message(msg)
+
 # ======================== UTILS ========================
 
 def hash_password(password: str) -> str:
@@ -240,6 +307,10 @@ UPLOAD_DIR = ROOT_DIR / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB
+
+# Hero video uploads
+ALLOWED_VIDEO_TYPES = {"video/mp4", "video/webm"}
+MAX_VIDEO_SIZE = 50 * 1024 * 1024  # 50MB
 
 # ======================== DEPENDENCIES ========================
 
@@ -288,6 +359,7 @@ async def register(data: UserCreate):
         "name": data.name,
         "email": data.email,
         "password": hash_password(data.password),
+        "auth_provider": "password",
         "role": data.role,
         "permissions": [],
         "status": user_status,
@@ -314,6 +386,9 @@ async def login(data: UserLogin):
     user = await db.users.find_one({"email": data.email}, {"_id": 0})
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    if not user.get("password"):
+        raise HTTPException(status_code=400, detail="This account has no password set. Use Google sign-in or reset your password.")
     
     if not verify_password(data.password, user["password"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -329,10 +404,160 @@ async def login(data: UserLogin):
             "name": user["name"],
             "email": user["email"],
             "role": user["role"],
+            "auth_provider": user.get("auth_provider", "password"),
             "status": user.get("status", "active"),
             "permissions": user.get("permissions", [])
         }
     }
+
+@api_router.post("/auth/google")
+async def login_with_google(data: GoogleLoginRequest):
+    if google_id_token is None or google_requests is None:
+        raise HTTPException(status_code=500, detail="Google auth is not installed on the backend.")
+
+    client_id = os.environ.get("GOOGLE_CLIENT_ID")
+    if not client_id:
+        raise HTTPException(status_code=500, detail="GOOGLE_CLIENT_ID is not configured on the backend.")
+
+    try:
+        idinfo = google_id_token.verify_oauth2_token(
+            data.credential,
+            google_requests.Request(),
+            audience=client_id,
+        )
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid Google credential")
+
+    email = idinfo.get("email")
+    name = idinfo.get("name") or (email.split("@")[0] if email else "User")
+    if not email:
+        raise HTTPException(status_code=400, detail="Google account did not return an email")
+
+    # Role safety: default to candidate, allow employer if requested
+    role = data.role if data.role in ("candidate", "employer") else "candidate"
+    user_status = "pending" if role == "employer" else "active"
+
+    user = await db.users.find_one({"email": email}, {"_id": 0})
+    if not user:
+        user_id = str(uuid.uuid4())
+        user_doc = {
+            "id": user_id,
+            "name": name,
+            "email": email,
+            "password": None,
+            "auth_provider": "google",
+            "google_sub": idinfo.get("sub"),
+            "role": role,
+            "permissions": [],
+            "status": user_status,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_by": None,
+        }
+        await db.users.insert_one(user_doc)
+        user = user_doc
+    else:
+        if user.get("status") == "blocked":
+            raise HTTPException(status_code=403, detail="Account is blocked")
+        # Keep existing role/status; just update name/sub if missing
+        upd = {}
+        if not user.get("google_sub") and idinfo.get("sub"):
+            upd["google_sub"] = idinfo.get("sub")
+        if user.get("auth_provider") != "google":
+            upd["auth_provider"] = user.get("auth_provider", "password")
+        if upd:
+            await db.users.update_one({"id": user["id"]}, {"$set": upd})
+
+    token = create_token(user["id"], user["role"], user.get("permissions", []))
+    return {
+        "token": token,
+        "user": {
+            "id": user["id"],
+            "name": user.get("name") or name,
+            "email": user["email"],
+            "role": user["role"],
+            "auth_provider": user.get("auth_provider", "google"),
+            "status": user.get("status", "active"),
+            "permissions": user.get("permissions", []),
+        },
+    }
+
+@api_router.post("/auth/password-reset/request")
+async def request_password_reset(data: PasswordResetRequest):
+    """
+    Always returns success message (prevents email enumeration).
+    If SMTP is configured, emails a reset link. In dev, can optionally return the token.
+    """
+    user = await db.users.find_one({"email": data.email}, {"_id": 0})
+    # Always respond the same
+    response = {"message": "If an account exists for that email, a reset link has been sent."}
+
+    if not user:
+        return response
+
+    raw_token = uuid.uuid4().hex + uuid.uuid4().hex
+    token_hash = sha256_hex(raw_token)
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=30)
+
+    await db.password_resets.insert_one(
+        {
+            "id": str(uuid.uuid4()),
+            "user_id": user["id"],
+            "token_hash": token_hash,
+            "used": False,
+            "expires_at": expires_at.isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+
+    frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+    reset_link = f"{frontend_url.rstrip('/')}/reset-password?token={raw_token}"
+
+    if can_send_email():
+        try:
+            send_reset_email(user["email"], reset_link)
+        except Exception as e:
+            logger.warning(f"Failed to send reset email: {e}")
+    else:
+        logger.info(f"Password reset link (SMTP not configured): {reset_link}")
+
+    if os.environ.get("DEV_RETURN_RESET_TOKEN", "0") == "1":
+        response["token"] = raw_token
+        response["reset_link"] = reset_link
+
+    return response
+
+@api_router.post("/auth/password-reset/confirm")
+async def confirm_password_reset(data: PasswordResetConfirm):
+    if len(data.new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+
+    token_hash = sha256_hex(data.token)
+    rec = await db.password_resets.find_one({"token_hash": token_hash, "used": False}, {"_id": 0})
+    if not rec:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+
+    try:
+        expires_at = datetime.fromisoformat(rec["expires_at"])
+    except Exception:
+        expires_at = datetime.now(timezone.utc) - timedelta(days=1)
+
+    if expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+
+    user = await db.users.find_one({"id": rec["user_id"]}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid reset token")
+
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {"password": hash_password(data.new_password), "auth_provider": user.get("auth_provider") or "password"}},
+    )
+    await db.password_resets.update_one(
+        {"token_hash": token_hash},
+        {"$set": {"used": True, "used_at": datetime.now(timezone.utc).isoformat()}},
+    )
+
+    return {"message": "Password reset successful. You can now log in."}
 
 @api_router.get("/auth/me")
 async def get_me(user: dict = Depends(get_current_user)):
@@ -878,6 +1103,83 @@ async def blog_upload_image(
         f.write(contents)
     url = f"/uploads/{filename}"
     return {"url": url}
+
+# ======================== HERO VIDEOS (SUPERADMIN) ========================
+
+@api_router.post("/hero/admin/videos/upload")
+async def hero_upload_video(
+    file: UploadFile = File(...),
+    title: Optional[str] = Form(None),
+    status: str = Form("active"),
+    order: int = Form(0),
+    user: dict = Depends(require_roles("superadmin")),
+):
+    if file.content_type not in ALLOWED_VIDEO_TYPES:
+        raise HTTPException(status_code=400, detail="Invalid file type. Use MP4 or WebM.")
+    contents = await file.read()
+    if len(contents) > MAX_VIDEO_SIZE:
+        raise HTTPException(status_code=400, detail="File too large. Max 50MB.")
+    ext = Path(file.filename or "video").suffix or ".mp4"
+    if ext.lower() not in (".mp4", ".webm"):
+        ext = ".mp4"
+    filename = f"hero-{uuid.uuid4().hex}{ext}"
+    filepath = UPLOAD_DIR / filename
+    with open(filepath, "wb") as f:
+        f.write(contents)
+
+    video_id = str(uuid.uuid4())
+    doc = {
+        "id": video_id,
+        "title": title or (Path(file.filename).stem if file.filename else "Hero Video"),
+        "url": f"/uploads/{filename}",
+        "status": status if status in ("active", "inactive") else "active",
+        "order": int(order or 0),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_by": user["id"],
+    }
+    await db.hero_videos.insert_one(doc)
+    return {k: v for k, v in doc.items() if k != "_id"}
+
+@api_router.get("/hero/admin/videos")
+async def hero_list_videos_admin(user: dict = Depends(require_roles("superadmin"))):
+    vids = await db.hero_videos.find({}, {"_id": 0}).sort([("order", 1), ("created_at", -1)]).to_list(200)
+    return vids
+
+@api_router.put("/hero/admin/videos/{video_id}")
+async def hero_update_video(video_id: str, data: HeroVideoUpdate, user: dict = Depends(require_roles("superadmin"))):
+    upd = {k: v for k, v in data.model_dump(exclude_unset=True).items() if v is not None}
+    if "status" in upd and upd["status"] not in ("active", "inactive"):
+        raise HTTPException(status_code=400, detail="Status must be active or inactive")
+    if upd:
+        await db.hero_videos.update_one({"id": video_id}, {"$set": upd})
+    doc = await db.hero_videos.find_one({"id": video_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Video not found")
+    return doc
+
+@api_router.delete("/hero/admin/videos/{video_id}")
+async def hero_delete_video(video_id: str, user: dict = Depends(require_roles("superadmin"))):
+    doc = await db.hero_videos.find_one({"id": video_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Video not found")
+    # best-effort delete file
+    try:
+        url = doc.get("url") or ""
+        if url.startswith("/uploads/"):
+            (UPLOAD_DIR / Path(url).name).unlink(missing_ok=True)
+    except Exception:
+        pass
+    r = await db.hero_videos.delete_one({"id": video_id})
+    if r.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Video not found")
+    return {"message": "Video deleted"}
+
+# ======================== HERO VIDEOS (PUBLIC) ========================
+
+@api_router.get("/hero/videos")
+async def hero_list_videos_public():
+    vids = await db.hero_videos.find({"status": "active"}, {"_id": 0}).sort([("order", 1), ("created_at", -1)]).to_list(50)
+    return vids
 
 # ======================== BLOG ADMIN - CATEGORIES ========================
 

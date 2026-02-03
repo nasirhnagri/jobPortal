@@ -5,10 +5,11 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Briefcase, Mail, Lock, ArrowRight, AlertCircle } from 'lucide-react';
+import { GoogleLogin, GoogleOAuthProvider } from '@react-oauth/google';
 import { toast } from 'sonner';
 
 export const Login = () => {
-  const { login } = useAuth();
+  const { login, googleLogin } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [loading, setLoading] = useState(false);
@@ -116,10 +117,56 @@ export const Login = () => {
             </Button>
           </form>
 
+          {/* Google login */}
+          <div className="mt-6">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-slate-200" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-white px-2 text-slate-500">Or continue with</span>
+              </div>
+            </div>
+            <div className="mt-4 flex justify-center">
+              <GoogleOAuthProvider clientId={process.env.REACT_APP_GOOGLE_CLIENT_ID || ''}>
+                <GoogleLogin
+                  onSuccess={async (res) => {
+                    try {
+                      const cred = res.credential;
+                      if (!cred) {
+                        toast.error('Google login failed. No credential.');
+                        return;
+                      }
+                      const user = await googleLogin(cred, 'candidate');
+                      toast.success('Signed in with Google');
+                      const routes = {
+                        superadmin: '/admin',
+                        subadmin: '/admin',
+                        employer: user.status === 'pending' ? '/employer/pending' : '/employer',
+                        candidate: '/candidate',
+                      };
+                      navigate(routes[user.role] || from);
+                    } catch (err) {
+                      toast.error(err.message || 'Google login failed');
+                    }
+                  }}
+                  onError={() => toast.error('Google login failed')}
+                  useOneTap={false}
+                />
+              </GoogleOAuthProvider>
+            </div>
+          </div>
+
           <p className="mt-8 text-center text-slate-600">
             Don't have an account?{' '}
             <Link to="/register" className="text-indigo-600 hover:text-indigo-700 font-medium" data-testid="register-link">
               Sign up
+            </Link>
+          </p>
+
+          <p className="mt-2 text-center text-slate-500 text-sm">
+            <Link to="/forgot-password" className="text-indigo-600 hover:text-indigo-700 font-medium">
+              Forgot your password?
             </Link>
           </p>
 

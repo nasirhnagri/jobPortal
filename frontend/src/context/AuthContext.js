@@ -55,6 +55,28 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const googleLogin = async (credential, role = 'candidate') => {
+    try {
+      const response = await axios.post(`${API}/auth/google`, { credential, role });
+      const { token: newToken, user: userData } = response.data;
+      localStorage.setItem('token', newToken);
+      axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+      setToken(newToken);
+      setUser(userData);
+      return userData;
+    } catch (err) {
+      if (err.code === 'ERR_NETWORK' || err.message === 'Network Error') {
+        throw new Error('Cannot connect to server. Make sure the backend is running at http://localhost:8000.');
+      }
+      if (err.response?.data?.detail) {
+        const detail = err.response.data.detail;
+        const msg = Array.isArray(detail) ? detail.map((d) => d.msg || d).join(', ') : String(detail);
+        throw new Error(msg);
+      }
+      throw new Error(err.message || 'Google login failed.');
+    }
+  };
+
   const register = async (name, email, password, role) => {
     try {
       const response = await axios.post(`${API}/auth/register`, { name, email, password, role });
@@ -89,7 +111,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, updateUser, token }}>
+    <AuthContext.Provider value={{ user, loading, login, googleLogin, register, logout, updateUser, token }}>
       {children}
     </AuthContext.Provider>
   );

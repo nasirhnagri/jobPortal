@@ -15,8 +15,11 @@ import {
   Star,
   TrendingUp,
   Shield,
-  Clock
+  Clock,
+  Moon,
+  Sun
 } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -27,9 +30,13 @@ export const Landing = () => {
   const [location, setLocation] = useState('');
   const [featuredJobs, setFeaturedJobs] = useState([]);
   const [stats, setStats] = useState({ jobs: 0, companies: 0, candidates: 0 });
+  const [heroVideos, setHeroVideos] = useState([]);
+  const [activeHeroVideo, setActiveHeroVideo] = useState(0);
+  const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
     fetchFeaturedJobs();
+    fetchHeroVideos();
   }, []);
 
   const fetchFeaturedJobs = async () => {
@@ -45,6 +52,25 @@ export const Landing = () => {
       console.error('Failed to fetch jobs:', error);
     }
   };
+
+  const fetchHeroVideos = async () => {
+    try {
+      const base = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
+      const res = await axios.get(`${base.replace(/\/$/, '')}/api/hero/videos`);
+      setHeroVideos(res.data || []);
+      setActiveHeroVideo(0);
+    } catch (e) {
+      setHeroVideos([]);
+    }
+  };
+
+  useEffect(() => {
+    if (!heroVideos || heroVideos.length <= 1) return;
+    const t = setInterval(() => {
+      setActiveHeroVideo((i) => (i + 1) % heroVideos.length);
+    }, 7000);
+    return () => clearInterval(t);
+  }, [heroVideos]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -94,6 +120,18 @@ export const Landing = () => {
             </nav>
 
             <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleTheme}
+                data-testid="theme-toggle-landing"
+              >
+                {theme === 'dark' ? (
+                  <Sun className="w-5 h-5 text-slate-600" />
+                ) : (
+                  <Moon className="w-5 h-5 text-slate-600" />
+                )}
+              </Button>
               {user ? (
                 <Button onClick={() => navigate(getDashboardLink())} data-testid="dashboard-button">
                   Dashboard
@@ -114,21 +152,43 @@ export const Landing = () => {
         </div>
       </header>
 
-      {/* Hero Section */}
+      {/* Hero Section with background video */}
       <section className="relative py-20 lg:py-32 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 via-white to-slate-50" />
+        {/* Background video (no dark overlay for full brightness) */}
+        {heroVideos.length > 0 && (
+          <video
+            key={heroVideos[activeHeroVideo]?.id || activeHeroVideo}
+            src={`${(process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000').replace(/\/$/, '')}${
+              heroVideos[activeHeroVideo]?.url || ''
+            }`}
+            className="absolute inset-0 w-full h-full object-cover"
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="metadata"
+          />
+        )}
+
         <div className="section-container relative">
           <div className="max-w-4xl mx-auto text-center">
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-slate-900 leading-tight" style={{ fontFamily: 'Manrope' }}>
+            <h1
+              className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-tight"
+              style={{ fontFamily: 'Manrope' }}
+            >
               Find Your Dream Job
-              <span className="text-indigo-600"> Today</span>
+              <span className="text-indigo-300"> Today</span>
             </h1>
-            <p className="mt-6 text-lg text-slate-600 max-w-2xl mx-auto">
-              Connect with top employers and discover opportunities that match your skills and aspirations. Your next career move starts here.
+            <p className="mt-6 text-lg text-slate-200 max-w-2xl mx-auto">
+              Connect with top employers and discover opportunities that match your skills and aspirations. Your next
+              career move starts here.
             </p>
 
             {/* Search Form */}
-            <form onSubmit={handleSearch} className="mt-10 p-4 bg-white rounded-2xl shadow-xl border border-slate-200">
+            <form
+              onSubmit={handleSearch}
+              className="mt-10 p-4 bg-white/95 backdrop-blur rounded-2xl shadow-xl border border-slate-200"
+            >
               <div className="flex flex-col md:flex-row gap-4">
                 <div className="flex-1 relative">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
@@ -162,18 +222,34 @@ export const Landing = () => {
             {/* Stats */}
             <div className="mt-12 flex flex-wrap justify-center gap-8 md:gap-16">
               <div className="text-center">
-                <p className="text-3xl font-bold text-indigo-600">{stats.jobs}+</p>
-                <p className="text-slate-600">Active Jobs</p>
+                <p className="text-3xl font-bold text-indigo-300">{stats.jobs}+</p>
+                <p className="text-slate-200">Active Jobs</p>
               </div>
               <div className="text-center">
-                <p className="text-3xl font-bold text-indigo-600">{stats.companies}+</p>
-                <p className="text-slate-600">Companies</p>
+                <p className="text-3xl font-bold text-indigo-300">{stats.companies}+</p>
+                <p className="text-slate-200">Companies</p>
               </div>
               <div className="text-center">
-                <p className="text-3xl font-bold text-indigo-600">{stats.candidates}+</p>
-                <p className="text-slate-600">Job Seekers</p>
+                <p className="text-3xl font-bold text-indigo-300">{stats.candidates}+</p>
+                <p className="text-slate-200">Job Seekers</p>
               </div>
             </div>
+
+            {/* Dots for multiple videos */}
+            {heroVideos.length > 1 && (
+              <div className="mt-8 flex items-center justify-center gap-2">
+                {heroVideos.map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setActiveHeroVideo(idx)}
+                    className={`h-2.5 w-2.5 rounded-full ${
+                      idx === activeHeroVideo ? 'bg-indigo-400' : 'bg-white/50'
+                    }`}
+                    aria-label={`Go to video ${idx + 1}`}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </section>
