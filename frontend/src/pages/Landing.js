@@ -68,7 +68,7 @@ export const Landing = () => {
     if (!heroVideos || heroVideos.length <= 1) return;
     const t = setInterval(() => {
       setActiveHeroVideo((i) => (i + 1) % heroVideos.length);
-    }, 7000);
+    }, 33000);
     return () => clearInterval(t);
   }, [heroVideos]);
 
@@ -340,21 +340,22 @@ export const Landing = () => {
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
-            <div className="text-center p-8">
+            {/* <div className="text-center p-8 border-2 border-white rounded-[30px] "> */}
+            <div className="text-center p-8 border-2 border-red-100 rounded-[20px] hover:bg-gray-600 hover:text-black transition duration-300">
               <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto">
                 <Shield className="w-8 h-8" />
               </div>
               <h3 className="mt-6 text-xl font-semibold">Verified Employers</h3>
               <p className="mt-3 text-slate-400">All employers go through our verification process to ensure legitimate opportunities.</p>
             </div>
-            <div className="text-center p-8">
+            <div className="text-center p-8 border-2 border-red-100 rounded-[20px] hover:bg-gray-600 hover:text-black transition duration-300">
               <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto">
                 <Clock className="w-8 h-8" />
               </div>
               <h3 className="mt-6 text-xl font-semibold">Quick Apply</h3>
               <p className="mt-3 text-slate-400">Apply to multiple jobs with a single profile. Track all your applications in one place.</p>
             </div>
-            <div className="text-center p-8">
+            <div className="text-center p-8 border-2 border-red-100 rounded-[20px] hover:bg-gray-600 hover:text-black transition duration-300">
               <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto">
                 <Star className="w-8 h-8" />
               </div>

@@ -314,8 +314,8 @@ export const SubAdminManagement = () => {
       </Dialog>
 
       {/* Edit Modal */}
-      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
-        <DialogContent className="max-w-md">
+      {/* <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+        <DialogContent className="max-w-md ">
           <DialogHeader>
             <DialogTitle>Edit Sub-Admin</DialogTitle>
             <DialogDescription>
@@ -364,7 +364,88 @@ export const SubAdminManagement = () => {
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog> */}
+      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+  <DialogContent className="max-w-md max-h-[85vh] flex flex-col">
+    
+    <DialogHeader>
+      <DialogTitle>Edit Sub-Admin</DialogTitle>
+      <DialogDescription>
+        Update sub-administrator details and permissions
+      </DialogDescription>
+    </DialogHeader>
+
+    {/* Scrollable Content Area */}
+    <div className="flex-1 overflow-y-auto space-y-4 py-4 pr-2">
+      
+      <div className="space-y-2">
+        <Label htmlFor="edit-name">Full Name</Label>
+        <Input
+          id="edit-name"
+          value={formData.name}
+          onChange={(e) =>
+            setFormData({ ...formData, name: e.target.value })
+          }
+          data-testid="edit-subadmin-name"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Email</Label>
+        <Input value={formData.email} disabled className="bg-slate-50" />
+      </div>
+
+      <div className="space-y-3">
+        <Label>Permissions</Label>
+
+        {PERMISSIONS.map((permission) => (
+          <div
+            key={permission.id}
+            className="flex items-start space-x-3 p-3 bg-slate-50 rounded-lg"
+          >
+            <Checkbox
+              id={`edit-${permission.id}`}
+              checked={formData.permissions.includes(permission.id)}
+              onCheckedChange={() =>
+                togglePermission(permission.id)
+              }
+            />
+
+            <div className="flex-1">
+              <label
+                htmlFor={`edit-${permission.id}`}
+                className="text-sm font-medium cursor-pointer"
+              >
+                {permission.label}
+              </label>
+              <p className="text-xs text-slate-500">
+                {permission.description}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    {/* Footer Fixed */}
+    <DialogFooter className="pt-4 border-t">
+      <Button
+        variant="outline"
+        onClick={() => setShowEditModal(false)}
+      >
+        Cancel
+      </Button>
+      <Button
+        onClick={handleUpdateSubadmin}
+        data-testid="submit-edit-subadmin"
+      >
+        Save Changes
+      </Button>
+    </DialogFooter>
+
+  </DialogContent>
+</Dialog>
+
     </DashboardLayout>
   );
 };
