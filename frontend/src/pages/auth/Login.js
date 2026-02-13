@@ -170,10 +170,10 @@ export const Login = () => {
             </Link>
           </p>
 
-          <div className="mt-8 p-4 bg-slate-50 rounded-lg">
+          {/* <div className="mt-8 p-4 bg-slate-50 rounded-lg">
             <p className="text-sm font-medium text-slate-700 mb-2">Demo Credentials:</p>
             <p className="text-sm text-slate-600">Super Admin: admin@jobconnect.com / Admin@123</p>
-          </div>
+          </div> */}
         </div>
       </div>
 
